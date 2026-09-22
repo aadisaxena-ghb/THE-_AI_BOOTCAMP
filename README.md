@@ -27,6 +27,6 @@ as the week progresses
 Python, Google collab, Jupyter Notebook, Numpy, Matlib 
 
 📁 Project Structure
+DAY_1
 
-🛠️ Tech Stack & Tools
-*(fill in as you go — e.g. Python, Jupyter Notebook, Pandas, scikit-learn, etc.)*
+
