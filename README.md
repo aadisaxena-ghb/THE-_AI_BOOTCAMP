@@ -24,9 +24,13 @@ README ──► Updated summary of topics + tools
 as the week progresses
 
 🛠️ Tech Stack & Tools
-Python, Google collab, Jupyter Notebook, Numpy, Matlib 
+Python, Google collab, Jupyter Notebook, Numpy, Matlib, cv, Tensor FLow, ultralytics, 
 
 📁 Project Structure
 DAY_1
-
+DAY_2
+DAY_3
+DAY_4
+FINAL_PROJECT
+ 
 
