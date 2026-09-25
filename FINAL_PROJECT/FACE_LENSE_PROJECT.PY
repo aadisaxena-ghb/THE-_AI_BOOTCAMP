@@ -1,7 +1,7 @@
 !pip install -q ultralytics "deepface[tensorflow]" tf-keras mtcnn
 
 import cv2, io, numpy as np
-from collections import deque
+from collections import deque, Counter
 from base64 import b64decode, b64encode
 from PIL import Image as PILImage
 from IPython.display import display, Javascript
@@ -11,7 +11,7 @@ settings.update({"sync": False})
 from ultralytics import YOLO
 from deepface import DeepFace
 
-yolo_model = YOLO('yolov8n.pt')
+yolo_model = YOLO('yolov8s.pt')   # CHANGED: was yolov8n.pt (nano) — 's' is more accurate, a bit slower
 
 def video_stream():
   display(Javascript('''
@@ -114,10 +114,12 @@ video_stream()
 label = 'Starting...'
 overlay = ''
 
-FACE_EVERY_N = 8              # CHANGED: back to a normal interval for smoothness
+FACE_EVERY_N = 12
 frame_no = 0
 faces_info = []
-age_history = deque(maxlen=8)  # CHANGED: rolling window of recent age readings
+age_history = deque(maxlen=15)
+emotion_history = deque(maxlen=10)
+gender_history = deque(maxlen=10)   # CHANGED: added for gender smoothing
 
 while True:
   reply = video_frame(label, overlay)
@@ -141,27 +143,36 @@ while True:
     cv2.putText(layer, f'{name} {conf:.2f}', (x1, max(y1 - 8, 15)),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0, 255), 2, cv2.LINE_AA)
 
-  # --- age + gender + emotion ---
+  # --- age + gender + emotion, for ALL faces ---
   if frame_no % FACE_EVERY_N == 0:
     try:
       analysis = DeepFace.analyze(
           frame, actions=['age', 'gender', 'emotion'],
-          enforce_detection=False, silent=True,
-          detector_backend='mtcnn'
+          enforce_detection=True,
+          silent=True,
+          detector_backend='retinaface'
       )
       new_faces = analysis if isinstance(analysis, list) else [analysis]
       new_faces = [f for f in new_faces if f['region']['w'] > 20 and f['region']['h'] > 20]
 
       if new_faces:
-        # CHANGED: smooth the age of the largest/main face using a rolling median
         main_face = max(new_faces, key=lambda f: f['region']['w'] * f['region']['h'])
+
+        # smooth age with rolling median
         age_history.append(main_face['age'])
-        smoothed_age = int(np.median(age_history))
-        main_face['age'] = smoothed_age            # overwrite with the smoothed value
+        main_face['age'] = int(np.median(age_history))
+
+        # smooth emotion with rolling most-common value
+        emotion_history.append(main_face['dominant_emotion'])
+        main_face['dominant_emotion'] = Counter(emotion_history).most_common(1)[0][0]
+
+        # CHANGED: smooth gender with rolling most-common value
+        gender_history.append(main_face['dominant_gender'])
+        main_face['dominant_gender'] = Counter(gender_history).most_common(1)[0][0]
 
       faces_info = new_faces
     except Exception:
-      faces_info = []
+      pass   # no confident face found this cycle; keep showing last known faces_info
 
   for f in faces_info:
     r = f['region']
@@ -179,6 +190,9 @@ while True:
               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0, 255), 2, cv2.LINE_AA)
 
   overlay = overlay_to_data_url(layer)
+  label = f'Faces: {len(faces_info)} | Objects: {detected_count}'
+
+print("Camera feed closed successfully.")
   label = f'Faces: {len(faces_info)} | Objects: {detected_count}'
 
 print("Camera feed closed successfully.")
